@@ -61,3 +61,15 @@ blank_list = []
 rdd3 = rdd2.aggregateByKey(blank_list, addItemToList, mergeLists)
 
 
+sc = init_spark('name')
+sql_str = "select sid, uid, id, ctime from recom.load_expose_click where pdate=20210528 and phour=00 and uid is not null and ctime is not null limit 10"
+rdd = sc.sql(sql_str).rdd
+rdd1 = rdd.sortBy(lambda x: x.ctime)  # 按ctime排序
+rdd2 = rdd1.map(lambda x: (x.uid, x.id))
+"""
+print(type(rdd1))
+print(type(rdd1.collect()))  # list
+"""
+blank_list = []
+
+rdd3 = rdd2.aggregateByKey(blank_list, addItemToList, mergeLists)
