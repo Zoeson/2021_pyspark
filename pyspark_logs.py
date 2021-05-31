@@ -58,7 +58,6 @@ print(type(rdd1.collect()))  # list
 """
 blank_list = []
 
-
 rdd3 = rdd2.aggregateByKey(blank_list, addItemToList, mergeLists)
 
 
