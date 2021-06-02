@@ -26,27 +26,6 @@ def init_spark(name):
     return spark
 
 
-def spark_sql():
-    """
-    spark sql：末尾不要加";"
-    :return:
-    """
-    # 这样读hive不太好使，读到的data是乱码，并且是Row()这种格式，不好处理
-    # data_path = '/user/hive/warehouse/rank.db/rank_news_profile_snapshot/pday=20210528/phour=20/'
-    # df = sc.read.text(data_path)
-
-    sc = init_spark('myname')
-    sql_str = 'select recom_id, simid, title from rank.rank_news_profile_snapshot where pday=20210528 and phour = 00 limit 10'
-    df = sc.sql(sql_str)  # <class 'pyspark.sql.dataframe.DataFrame'>
-    df_rdd = df.rdd  #
-    rdd = df_rdd.map(lambda line: '\t'.join([line.recom_id, line.simid, line.title]))
-    print("example:", rdd.take(2))
-    print('count:', rdd.count())  # 10
-
-    # rdd存入hdfs
-    out_path = 'user/recom/recall/mind/spark_tmp/'
-    rdd.repartition(20).saveAsTextFile(out_path)
-
 
 def add(a, b):
     c = a + b
@@ -110,6 +89,7 @@ def aggregate_func_def(num):  # https://www.cnblogs.com/LHWorldBlog/p/8215529.ht
         return a + b  # 累加起来
 
     print(' =====num:', num)
+    sc = init_spark(' ')
     rdd = sc.parallelize([(1, 1), (1, 2), (2, 1), (2, 3), (2, 4), (1, 7)], num)
     aggregateRDD = rdd.aggregateByKey(3, seqFunc, combFunc)
 
@@ -147,6 +127,7 @@ def addItemToList(lst, val):
 def mergeLists(lst1, lst2):
     return lst1 + lst2
 
+
 def merge_wrong():
     conf = SparkConf().setAppName("lg").setMaster('local[4]')
     sc1 = SparkContext.getOrCreate(conf)
@@ -166,11 +147,30 @@ def merge_wrong():
                           1)  # type(rdd): <class 'pyspark.rdd.RDD'>
 
 
-# if __name__ == "__main__":
-from pyspark import SparkContext
-from pyspark import SparkConf
+def merge_wright():
+    sc = init_spark('myname')
+    sql_str = 'select uid, id, ctime from recom.load_expose_click where pdate=20210521 and phour=00 and ' \
+              'uid is not null and id is not null and ctime is not null and ' \
+              'sch not in ("relateDocOrig", "relateVideoOrig")'
+    rdd = sc.sql(sql_str).rdd
+    rdd1 = rdd.sortBy(lambda x: x.ctime)  # 按ctime排序
+    rdd2 = rdd1.map(lambda x: (x.uid, (x.id, x.ctime)))
+    blank_list = []
+    rdd3 = rdd2.aggregateByKey(blank_list, addItemToList, mergeLists)
+    return rdd3
 
 
+target_partition = 'pdate=20210521/phour=01'
+next_partition = 'pdate=20210521/phour=02'
+expose_cmd = 'hive -e "show partitions recom.load_expose_click" 2>> hive_error |tail -300'
+profile_cmd = 'hive -e "show partitions rank.rank_news_profile_snapshot" 2>> hive_error |tail -300'
 
-
-
+date = '20210521'
+hour = '01'
+time_condition = 'pdate=' + date + ' and phour=' + hour
+sql_str = 'select uid, id, ctime from recom.load_expose_click where ' + time_condition + \
+          ' and uid is not null and id is not null and ctime is not null and ' \
+          'sch not in ("relateDocOrig", "relateVideoOrig")'
+rdd_hour = sc.sql(sql_str).rdd.map(lambda x: '\t'.join([x.uid, x.id, x.ctime]))
+save_path = '/user/recom/recall/mind/click_log/2021052101'
+rdd_hour.repartition(100).saveAsTextFile(save_path)
