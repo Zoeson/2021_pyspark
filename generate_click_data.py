@@ -48,11 +48,17 @@ def get_latest_date_hour():
     else:
         print('_SUCCESS')
 
-    return latest_date[:8], latest_date[8:]
+    return latest_date
 
 
-def get_new_time(date_str, hour_str, num):
-    now_time = datetime.datetime.strptime(date_str + hour_str, '%Y%m%d%H')
+def get_run_time():
+    latest_date = get_latest_date_hour()
+    print('==========DATA dir latest:{}'.format(latest_date))
+    return get_new_time(latest_date, 1)
+
+
+def get_new_time(now_time_str, num):
+    now_time = datetime.datetime.strptime(now_time_str, '%Y%m%d%H')
     delta = datetime.timedelta(hours=num)
     next_time = now_time + delta
     next_time_str = next_time.strftime('%Y%m%d%H')
@@ -62,7 +68,7 @@ def get_new_time(date_str, hour_str, num):
 def check_data(date, hour):
     partition_target = 'pdate=' + date + '/phour=' + hour  # log data: contain run_hour
 
-    date_next, hour_next = get_new_time(date, hour, 1)
+    date_next, hour_next = get_new_time(date+hour, 1)
     partition_next_hour = 'pdate=' + date_next + '/phour=' + hour_next  # user,item：contain hour after run_hour
     print('target_partition:{}\nnext_partition:{}'.format(partition_target, partition_next_hour))
 
@@ -79,7 +85,7 @@ def check_data(date, hour):
     return cond_log and cond_profile
 
 
-def get_weekly_data(sc, date_before, hour_before, date, hour):
+def get_weekly_data(sc,  date, hour):
     """
     todo: filter_condition: timeStamp
     rdd_filter = rdd_split.filter(lambda x: x[2] < '1621530000')  date=20210521 01: 1621530000
@@ -90,6 +96,7 @@ def get_weekly_data(sc, date_before, hour_before, date, hour):
     :param hour:
     :return:
     """
+    date_before, hour_before = get_new_time(date+hour, -1)
     time_cond = 'pdate=' + date_before + ' and phour=' + hour_before
     print('=====Read WEEK LOG data: {}'.format(time_cond))
     # read_path = '/user/recom/recall/mind/click_log/2021052100'
@@ -97,7 +104,7 @@ def get_weekly_data(sc, date_before, hour_before, date, hour):
     rdd_week = sc.sparkContext.textFile(read_path)
     rdd_split = rdd_week.map(lambda x: x.split('\t'))
     time_filter = str(int(time.mktime(time.strptime(date + hour, '%Y%m%d%H'))) - 5 * 60 * 60 * 1000)
-    rdd_filter = rdd_split.filter(lambda x: x[2] < time_filter)
+    rdd_filter = rdd_split.filter(lambda x: x[2] > time_filter)
     print('rdd_split.count(): {} rdd_week.count(): {}\nrdd_filter.take(2): {}'.format(
         rdd_week.count(), rdd_filter.count(), rdd_filter.take(2)))
 
@@ -134,15 +141,14 @@ def clean(data_dir, max_keep):
 if __name__ == "__main__":
     s_c = init_spark()
 
-    latestDate, latestHour = get_latest_date_hour()
-    run_date, run_hour = get_new_time(latestDate, latestHour, 1)
-    print('==========DATAdir latest:{}\n        next hour: {}'.format(latestDate + latestHour, run_date + run_hour))
+    run_date, run_hour = get_run_time()
+    print('====run date hour: {}'.format(run_date+run_hour))
 
     while True:
         if check_data(run_date, run_hour):
             print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&& data ready &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
             print('start time:{}'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-            get_weekly_data(s_c, latestDate, latestHour, run_date, run_hour)
+            get_weekly_data(s_c, run_date, run_hour)
             print("cleaning history data ...")
             clean('click_log', 10)
             time.sleep(5)
@@ -150,3 +156,5 @@ if __name__ == "__main__":
         else:
             print("data not ready, time sleep 10 minutes")
             time.sleep(600)
+
+        run_date, run_hour = get_run_time()
