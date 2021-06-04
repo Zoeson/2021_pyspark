@@ -1,9 +1,9 @@
- #!/bin/bash
-
-/usr/local/service/spark/bin/spark-submit \
+#!/bin/bash
+$SPARK_HOME/bin/spark-submit \
 --master yarn \
 --deploy-mode cluster \
 --name "download_click_data" \
+#--conf spark.pyspark.python=/data/recom/install/anaconda3/bin/python \
 --conf spark.port.maxRetries=100 \
 --conf spark.default.parallelism=1000 \
 --conf spark.sql.shuffle.partitions=1000 \
@@ -21,8 +21,7 @@
 --conf spark.broadcast.compress=true \
 --conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
 --queue "recom" \
---name "down_rank_data" \
-/date/recom/recall/tfgpu/generate_click_data.py
+/data/recom/recall/tfgpu/generate_click_data.py
 
 echo "Done"
 
