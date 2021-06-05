@@ -12,7 +12,6 @@ import time
 import re
 import findspark
 findspark.init()
-
 from pyspark.sql import SparkSession
 #         .config("spark.driver.host", "localhost") \
 
@@ -104,12 +103,7 @@ def get_weekly_data(sc,  date, hour):
     rdd_week = sc.sparkContext.textFile(read_path)
     rdd_split = rdd_week.map(lambda x: x.split('\t'))
     time_filter = str(int(time.mktime(time.strptime(date + hour, '%Y%m%d%H'))) - 5 * 60 * 60 * 1000)
-    rdd_filter = rdd_split.filter(lambda x: x[2] > time_filter)
-
-    # todo 测试count的时间
-    print('        filter count:')
-    t = datetime.datetime.now()
-    print(rdd_filter.count(), '测试count的时间cost_time:{}'.format(datetime.datetime.now() - t))
+    rdd_filter = rdd_split.filter(lambda x: x[2] > time_filter)   # 此时count是花时间的
 
     time_condition = 'pdate=' + date + ' and phour=' + hour
     print('    2. Read new LOG data: {}'.format(time_condition))
@@ -127,7 +121,8 @@ def get_weekly_data(sc,  date, hour):
     t = datetime.datetime.now()
     rdd_week_new.repartition(100).saveAsTextFile(save_path)
     print('    5. CONSUME TIME:{}'.format(datetime.datetime.now() - t))
-    print('     rdd_week_new.count:{}  consume time:{}'.format(datetime.datetime.now() - t))
+    # test
+    print('     rdd_week_new.count:{}  test count after save_path: consume time:{}'.format(rdd_week_new.count(), datetime.datetime.now() - t))
 
 
 def clean(data_dir, max_keep):

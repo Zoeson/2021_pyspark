@@ -16,13 +16,23 @@
             java.nio.channels.ClosedByInterruptException
 
 
-    sql_str = 'select uid, id, ctime from recom.load_expose_click where pdate=20210521 and phour=00 and uid is not null ' \
-          'and id is not null and ctime is not null and sch not in ("relateDocOrig", "relateVideoOrig")'
+sql_str = 'select uid, id, ctime from recom.load_expose_click where pdate=20210521 and phour=00 and uid is not null ' \
+      'and id is not null and ctime is not null and sch not in ("relateDocOrig", "relateVideoOrig")'
 
     date = '20210521'
     hour = '01'
     out_path = '/user/recom/recall/mind/click_log/20210521/01/hour_log'
     file_path = '/user/recom/recall/mind/click_log/20210521/01/hour_log'
+
+
+set mapred.job.queue.name=recom;
+set mapreduce.map.memory.mb=10150;
+set mapreduce.map.java.opts=-Xmx6144m;
+set mapreduce.reduce.memory.mb=10150;
+set mapreduce.reduce.java.opts=-Xmx8120m;
+
+sql_str = 'select count(*) from recom.load_expose_click where concat(pdate,phour) between "2021052101" and "2021052102" and uid is not null ' \
+      'and id is not null and ctime is not null and sch not in ("relateDocOrig", "relateVideoOrig")'
 
 """
 import os
