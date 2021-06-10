@@ -71,8 +71,8 @@ def get_latest_date_hour():
 
     # 检查最新事件的文件夹是否有SUCCESS,如果成功，继续，否则，退出
     success_path = base_dir + '/' + date + '/' + hour + '/_SUCCESS'
-    success_cmd = 'hadoop fs -test -e' + success_path
-    sys_value = os.symtem(success_cmd)
+    success_cmd = 'hadoop fs -test -e ' + success_path
+    sys_value = os.system(success_cmd)
     if sys_value != 0:
         print('!!! !!! check latest DATA failed! not exist: ', success_path)
         sys.exit(-1)
@@ -105,9 +105,9 @@ def check_data(date, hour):
     date_next, hour_next = get_new_date_hour(date, hour, 1)
     partition_target = 'pdate=' + date + '/phour=' + hour
     partition_next_hour = 'pdate=' + date_next + '/phour=' + hour_next
-    print('target_partition:{}\nnext hour partition:{}'.fomat(partition_target, partition_next_hour))
+    print('target_partition:{}\nnext hour partition:{}'.format(partition_target, partition_next_hour))
 
-    expose_cmd = 'hive -e "show partitions recom.load_expose_click" 2>>.hive/errorr |tail -300'
+    expose_cmd = 'hive -e "show partitions recom.load_expose_click" 2>>.hive/error |tail -300'
     profile_cmd = 'hive -e "show partitions rank.rank_news_profile_snapshot" 2>>.hive/error |tail -300'
 
     expose_result = exec_cmd(expose_cmd)

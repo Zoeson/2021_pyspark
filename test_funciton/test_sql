@@ -17,6 +17,13 @@ findspark.init()
 from pyspark.sql import SparkSession
 
 
+set mapred.job.queue.name=recom;
+set mapreduce.map.memory.mb=10150;
+set mapreduce.map.java.opts=-Xmx6144m;
+set mapreduce.reduce.memory.mb=10150;
+set mapreduce.reduce.java.opts=-Xmx8120m;
+
+
 def init_spark():
     spark = SparkSession \
         .builder \
@@ -33,3 +40,13 @@ rdd_data = sc.sql(sql_str).rdd.map(lambda line: '\t'.join([line.uid, line.id, li
 rdd_item = rdd_data.groupByKey().mapValues(len)
 rdd_filter = rdd_item.filter(lambda x:x[1] >3)
 rdd_filter.count()
+select count(*) from recom.load_expose_click where pdate=20210521 and phour =01 and uid is not null and id is not null and ctime is not null and sch not in ("relateDocOrig", "relateVideoOrig")
+
+select count(*) from rank.rank_user_profile_snapshot where pday = 20210527 and phour=00 and general_doc_timesensitive is not null;
+-----------------
+general_doc_timesensitive,suppose_group,suppose_job, suppose_economy from rank.rank_user_profile_snapshot where pday = 20210527 and phour=00 and general_doc_timesensitive is not null limit 10;
+general_vid_timesensitive,
+
+select user_group from rank.rank_user_profile_snapshot where pday = 20210527 and phour=00 and user_group is not null;
+
+select uid, id, ctime, dur_sec, readrate from recom.load_expose_click where pdate=20210521 and phour=01 and uid is not null and id is not null and ctime is not null and sch not in ("relateDocOrig", "relateVideoOrig") and (dur_sec >=10.0 or readrate >= 10.0) limit 20;
