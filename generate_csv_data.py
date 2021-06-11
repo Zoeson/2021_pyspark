@@ -13,6 +13,8 @@
 ps:
     时间戳加减，time.mktime = hour_num*60*60,没有1000!没有1000!没有1000!,或者直接计算hour_num小时之前日期,转化时间戳，不要这样减
 
+
+
 """
 
 import os
@@ -28,12 +30,18 @@ from pyspark.sql import SparkSession
 
 
 def init_spark():
+    """
+    服务器 client提交，有下面2行会报错
+    .config('spark.sql.hive.convertMetastoreParquet', False) \
+    .config('spark.driver.host', 'localhost') \
+
+    .appName('name')： 这一行是用yarn提交时，显示的spark的name
+    :return:
+    """
     spark = SparkSession \
         .builder \
         .appName('name') \
         .enableHiveSupport() \
-        .config('spark.driver.host', 'localhost') \
-        .config('spark.sql.hive.convertMetastoreParquet', False) \
         .getOrCreate()
     return spark
 
@@ -173,7 +181,7 @@ if __name__ == "__main__":
         if check_data_ready(next_date, next_hour):
             print('========start time:{}'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
             # todo: 最终用1周的数据，但是先用一天的数据进行测试
-            get_new_data(s_c, date, hour, next_date, next_hour, 24)
+            get_new_data(s_c, date, hour, next_date, next_hour, 7*24)
 
             print("cleaning history data ...")
             clean('click_log', 7)
