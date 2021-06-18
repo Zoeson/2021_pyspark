@@ -10,9 +10,9 @@ from .feature_column import SparseFeat, VarLenSparseFeat, DenseFeat
 from tensorflow.python.keras.layers import Embedding, Lambda
 from tensorflow.python.keras.regularizers import l2
 from collections import defaultdict
-from deepmatch.layers.utils import Hash
+from .layer_utils import Hash
 from itertools import chain
-from .layers.sequence import SequencePoolingLayer, WeightedSequenceLayer
+from .sequence import SequencePoolingLayer, WeightedSequenceLayer
 
 
 def create_embedding_matrix(feature_columns, l2_reg, seed, prefix="", seq_mask_zero=True):

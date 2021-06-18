@@ -9,13 +9,13 @@
 
 from tensorflow.python.keras.layers import Concatenate
 from tensorflow.python.keras.models import Model
-from ..feature_column import SparseFeat, DenseFeat, VarLenSparseFeat, build_input_features
-from ..inputs import create_embedding_matrix, embedding_lookup, varlen_embedding_lookup, get_varlen_pooling_list, \
+from .feature_column import SparseFeat, DenseFeat, VarLenSparseFeat, build_input_features
+from .inputs import create_embedding_matrix, embedding_lookup, varlen_embedding_lookup, get_varlen_pooling_list, \
     get_dense_input
-from ..layers.core import PoolingLayer, CapsuleLayer, DNN, EmbeddingIndex, LabelAwareAttention, SampledSoftmaxLayer
-from ..layers.utils import NoMask, combined_dnn_input
+from .core import PoolingLayer, CapsuleLayer, DNN, EmbeddingIndex, LabelAwareAttention, SampledSoftmaxLayer
+from .layer_utils import NoMask, combined_dnn_input
 import tensorflow as tf
-from ..utils import get_item_embedding
+from .utils import get_item_embedding
 
 
 def tile_user_otherfeat(user_other_feature, k_max):

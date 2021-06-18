@@ -23,3 +23,7 @@ def get_item_embedding(item_embedding, item_input_layer):
 
 def sampledsoftmaxloss(y_true, y_pred):
     return K.mean(y_pred)
+
+
+def recall_N(y_true, y_pred, N=50):
+    return len(set(y_pred[:N]) & set(y_true)) * 1.0 / len(y_true)

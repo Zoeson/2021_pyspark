@@ -28,13 +28,15 @@ import random
 import numpy as np
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
-from feature_column import SparseFeat, VarLenSparseFeat
+from model.feature_column import SparseFeat, VarLenSparseFeat
 
 
-
-def preprocess_data(data, inum, unum):
+def preprocess_data(data, inum=3, unum=6):
     """
-        用户行为日志数据处理：  iid<3    uid<6
+        用户行为日志数据处理：
+        iid<3     33.5万--》 18.6万
+        uid<6     311.7万 --》 163.3万
+        总click记录： 6460万 --》 6092万
     :param data:
     :return:
     """
@@ -54,7 +56,9 @@ def preprocess_data(data, inum, unum):
     user_val = [user_id for user_id, v in user_dict.items() if v >= unum]
     data_filter = data_fiter_item[data_fiter_item['uid'].isin(user_val)]
     print('user过滤前后    :', len(user_dict), "|", len(user_val))
-    print('data过滤user    :', data_fiter_item.shape, '|', data_filter.shape)
+    print('item过滤    :', len(data_fiter_item['id'].unique()), '|', len(data_filter['id'].unique()))
+    print('data过滤    :', data_fiter_item.shape, '|', data_filter.shape)
+
     data_sort = data_filter.sort_values('ctime', ascending=True)
 
     return data_sort
@@ -96,11 +100,13 @@ def gen_model_input(train_set, seq_max_len):
 
     return train_model_input, train_label
 
+
 def get_xy():
     # 1. read_data
-    data = pd.read_csv('./data_files/expose.csv')
+    data = pd.read_csv('./data_files/expose.csv', delimiter='\t')
+    print('data.shape:{}'.format(data.shape))
     print(data.head())
-    data = preprocess_data(data)
+    data = preprocess_data(data[:1000000])
 
     # 2. Label Encoding for sparse features,
     SEQ_LEN = 64
@@ -115,6 +121,7 @@ def get_xy():
 
     train_set, test_set = gen_data_set(data, negsample)
     train_model_input, train_label = gen_model_input(train_set, SEQ_LEN)
+    test_model_input, test_label = gen_model_input(test_set, SEQ_LEN)
 
     # 3. 配置一下模型定义需要的特征列，主要是特征名和embedding词表的大小
     embedding_dim = 16
@@ -125,6 +132,8 @@ def get_xy():
                             ]
     item_feature_columns = [SparseFeat('item_id', feature_max_idx['id'], embedding_dim)]
 
-    return train_model_input, train_label, user_feature_columns, item_feature_columns
+    item_unique = data['id'].uinique()
+
+    return train_model_input, train_label, user_feature_columns, item_feature_columns, item_unique
 
 
