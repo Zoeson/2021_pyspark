@@ -13,10 +13,8 @@ from tensorflow.python.keras import backend as K
 
 
 def get_item_embedding(item_embedding, item_input_layer):
-    print("pooling_item_embedding_weight: {}\nitem_input_layer:{}".format(item_embedding, item_input_layer))
     b = Lambda(lambda x: tf.squeeze(tf.gather(item_embedding, x), axis=1))(
         item_input_layer)
-    print('item_embedding:', b)
     return Lambda(lambda x: tf.squeeze(tf.gather(item_embedding, x), axis=1))(
         item_input_layer)
 

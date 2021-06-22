@@ -22,13 +22,14 @@ from process_data import preprocess_data, gen_data_set, gen_model_input
 import numpy as np
 import faiss
 from tqdm import tqdm
-
-# if __name__ == '__main__':
-K.set_learning_phase(True)
 import tensorflow as tf
+import os
+from datetime import datetime
+
+K.set_learning_phase(True)
 
 
-def faiss_ivf_PQ(data, dim, m, nlist, nprobe=1):
+def faiss_ivf_PQ(data, dim, nlist, m=4, nprobe=1):
     print('====================### IVF PQ ###==========================')
     quantizer = faiss.IndexFlatL2(dim)
     index_IVF = faiss.IndexIVFPQ(quantizer, dim, nlist, m, 8)
@@ -43,12 +44,11 @@ def faiss_ivf_FLAT(item_embs, embedding_dim, nlist):
     index = faiss.IndexIVFFlat(quantizer, embedding_dim, nlist, faiss.METRIC_L2)  # index_IVF.is_trained=Flase
     index.train(item_embs)  # index_IVF.is_trained=True
     index.add(item_embs)  # 建索引
+    return index
 
 
 def merge_faiss_result(distance, indexId):
-    print(distance.shape)
     dis_list = distance.reshape(1, -1)[0]
-    print('dis_list.shape:', len(dis_list))
     idx_list = indexId.reshape(1, -1)[0]
     result = {}
     for key, dis in zip(idx_list, dis_list):
@@ -56,112 +56,128 @@ def merge_faiss_result(distance, indexId):
             result[key] = min(dis, result[key])
         else:
             result[key] = dis
-    if len(idx_list) != len(result):
-        print(idx_list)
+
     # 排序，按照values的大小排序
     result = sorted(result.items(), key=lambda x: x[1], reverse=False)
     return result
 
 
-model_name = 'MIND'
+def merge_csv_data(path):
+    list_file = os.listdir(path)
+    list_file_path = [os.path.join(path, file) for file in list_file if file != '_SUCCESS']
+    df_list = []
+    st = datetime.now()
+    i = 0
+    for file_path in list_file_path:
+        df = pd.read_csv(file_path, delimiter='\t')
+        df_list.append(df)
+        i += 1
+        print('{} finished'.format(i))
+    print('read_csv  {} cost time:{}'.format(i, datetime.now() - st))
+    data_all = pd.concat(df_list)
+    print('concat datafram time:{}'.format(datetime.now() - st))
+    return data_all
 
-if tf.__version__ >= '2.0.0':
-    tf.compat.v1.disable_eager_execution()
-# x, y, user_feature_columns, item_feature_columns, item_all = get_xy()
 
-# 1. read_data
-data = pd.read_csv('./data_files/expose.csv', delimiter='\t')
-print('data.shape:{}'.format(data.shape))
-print(data.head())
-data = preprocess_data(data[:1000000], 3, 6)
+if __name__ == '__main__':
+    model_name = 'MIND'
 
-# 2. Label Encoding for sparse features,
-SEQ_LEN = 64
-negsample = 0
-features = ['uid', 'id']
-feature_max_idx = {}
+    if tf.__version__ >= '2.0.0':
+        tf.compat.v1.disable_eager_execution()
 
-for feature in features:
-    lbe = LabelEncoder()
-    data[feature] = lbe.fit_transform(data[feature]) + 1
-    feature_max_idx[feature] = data[feature].max() + 1
+    # todo 1. read_data
+    data = merge_csv_data('/data/recom/recall/tfgpu/08')
+    # data = pd.read_csv('./data_files/expose.csv', delimiter='\t')
+    print('原始data.shape:{}'.format(data.shape))
+    print('data.head():\n', data.head())
+    data = preprocess_data(data, 3, 6)
 
-# 3. 配置一下模型定义需要的特征列，主要是特征名和embedding词表的大小
-embedding_dim = 16
-user_feature_columns = [SparseFeat('user_id', feature_max_idx['uid'], embedding_dim),
-                        VarLenSparseFeat(SparseFeat('hist_item_id', feature_max_idx['id'], embedding_dim,
-                                                    embedding_name="item_id"), SEQ_LEN, 'mean', 'hist_len'),
-                        ]
-item_feature_columns = [SparseFeat('item_id', feature_max_idx['id'], embedding_dim)]
+    # todo 2. Label Encoding for sparse features,
+    SEQ_LEN = 64
+    negsample = 0
+    features = ['uid', 'id']
+    feature_max_idx = {}
 
-# 4. train data and test data
-train_set, test_set = gen_data_set(data, negsample)
-train_model_input, train_label = gen_model_input(train_set, SEQ_LEN)
-test_model_input, test_label = gen_model_input(test_set, SEQ_LEN)
+    for feature in features:
+        lbe = LabelEncoder()
+        data[feature] = lbe.fit_transform(data[feature]) + 1
+        feature_max_idx[feature] = data[feature].max() + 1
+    print('labelEncoder之后，data.head()\n', data.head())
 
-# 5. init, compile, fit MIND model
-model = MIND(user_feature_columns, item_feature_columns, num_sampled=5, user_dnn_hidden_units=(64, 16),
-             dynamic_k=True)
+    # todo 3. 配置一下模型定义需要的特征列，主要是特征名和embedding词表的大小
+    embedding_dim = 16
+    user_feature_columns = [SparseFeat('user_id', feature_max_idx['uid'], embedding_dim),
+                            VarLenSparseFeat(SparseFeat('hist_item_id', feature_max_idx['id'], embedding_dim,
+                                                        embedding_name="item_id"), SEQ_LEN, 'mean', 'hist_len'),
+                            ]
+    item_feature_columns = [SparseFeat('item_id', feature_max_idx['id'], embedding_dim)]
 
-model.compile(optimizer='adam', loss=sampledsoftmaxloss)
-model.fit(train_model_input, train_label, batch_size=2048, epochs=2, validation_split=0.5)
-print(model_name + " test train valid pass!")
+    # todo 4. train data and test data
+    train_set, test_set = gen_data_set(data, negsample)
+    print('train_set.shape: {}  test_set.shape: {}'.format(len(train_set), len(test_set)))
+    train_model_input, train_label = gen_model_input(train_set, SEQ_LEN)
+    test_model_input, test_label = gen_model_input(test_set, SEQ_LEN)
 
-# 6. user and item embedding model:  model.user_input=inputs_list  model.item_input=item_inputs_list
-user_embedding_model = Model(inputs=model.user_input, outputs=model.user_embedding)
-item_embedding_model = Model(inputs=model.item_input, outputs=model.item_embedding)
+    # todo 5. init, compile, fit MIND model
+    model = MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=8, user_dnn_hidden_units=(64, 16),
+                 dynamic_k=True)
 
-# 7. user and item data for embedding
-test_user_model_input = test_model_input
-# test_user_model_input = {"user_id": train_uid, "movie_id": train_iid, "hist_movie_id": train_seq_pad,
-#                          "hist_len": train_hist_len}
-item_profile = data[["id"]].drop_duplicates('id')
-all_item_model_input = {"item_id": item_profile['id'].values}  # [[36608], [39277], [], ...]
-print('all_item_model_input:', all_item_model_input['item_id'][:20])
+    model.compile(optimizer='adam', loss=sampledsoftmaxloss)
+    model.fit(train_model_input, train_label, batch_size=2048*4, epochs=2, validation_split=0.5)
+    print(model_name + " test train valid pass!")
 
-user_embs = user_embedding_model.predict(test_user_model_input, batch_size=2 ** 12)
-item_embs = item_embedding_model.predict(all_item_model_input, batch_size=2 ** 12)
+    # todo 6. user and item embedding model:  model.user_input=inputs_list  model.item_input=item_inputs_list
+    user_embedding_model = Model(inputs=model.user_input, outputs=model.user_embedding)
+    item_embedding_model = Model(inputs=model.item_input, outputs=model.item_embedding)
 
-print('##### USER_embs.shape:', user_embs.shape)
-print('item_embs.shape:', item_embs.shape)
+    # todo 7. user and item data for embedding
+    test_user_model_input = test_model_input
+    # test_user_model_input = {"user_id": train_uid, "movie_id": train_iid, "hist_movie_id": train_seq_pad,
+    #                          "hist_len": train_hist_len}
+    item_profile = data[["id"]].drop_duplicates('id')
+    all_item_model_input = {"item_id": item_profile['id'].values}  # [[36608], [39277], [], ...]
 
-# 5. [Optional] ANN search by faiss  and evaluate the result
-test_true_label = {line[0]: [line[2]] for line in test_set}  # uid: next_click_id
+    user_embs = user_embedding_model.predict(test_user_model_input, batch_size=2 ** 12)
+    item_embs = item_embedding_model.predict(all_item_model_input, batch_size=2 ** 12)
 
-# index = faiss.IndexIVFFlat(embedding_dim)
-nlist = 100
-nprobe = 10
-m = 4  # 可以调
-top_k = 10
+    print('###################')
+    print('test_user_model_input输入：keys:', test_user_model_input.keys(), 'shape:',
+          len(test_user_model_input['user_id']))
+    print('测试样本的 USER_embs.shape:', user_embs.shape)
+    print('所有item : item_embs.shape:', item_embs.shape)
 
-# index = faiss_ivf_FLAT(item_embs, embedding_dim, nlist)
-index = faiss_ivf_PQ(item_embs, embedding_dim, m, nlist)
+    # todo 5. [Optional] ANN search by faiss  and evaluate the result
+    test_true_label = {line[0]: [line[2]] for line in test_set}  # uid: next_click_id
 
-for user in user_embs[:2]:
-    distance, idx = index.search(user, top_k)  # emb: 4个向量。<class 'numpy.ndarray'> == (4, 32)
-    merge_result = merge_faiss_result(distance, idx)
+    nlist = 100
+    nprobe = 10  # top_k = 10
 
-# ascontiguousarray函数将一个内存不连续存储的数组转换为内存连续存储的数组，使得运行速度更快。
-# 变换前后，user_embs的类型不变，<class 'numpy.ndarray'>, shape不变：(item_num, 2, 16)
-# D, I = index.search(np.ascontiguousarray(user_embs), 50)
+    index = faiss_ivf_PQ(item_embs, embedding_dim, nlist)
+    # index = faiss_ivf_FLAT(item_embs, embedding_dim, nlist)
 
-top_N_list = [5, 10, 20, 50, 100]
-score_N = np.zeros(len(top_N_list))
-# test_user_model_input:{'user_id':[d1,d2, ...], ''}
-for i, uid in tqdm(enumerate(test_user_model_input['user_id'])):
-    try:
-        for top_N in range(len(top_N_list)):
-            user_embedding = user_embs[i]
-            distance, idx = index.search(user_embedding, top_k)  # emb: 4个向量。<class 'numpy.ndarray'> == (4, 32)
-            merge_result = merge_faiss_result(distance, idx)
-            pred = [item_profile['id'].values[x] for x in merge_result]
+    top_N_list = [5, 10, 20, 50, 100]
+    score_N = np.zeros(len(top_N_list))
 
-            if test_true_label[uid] in pred[:N]:
-                score_N[n] += 1
-    except:
-        print(i)
+    print('test sample numbere:{}'.format(len(test_user_model_input['user_id'])))
+    for i, uid in tqdm(enumerate(test_user_model_input['user_id'][:2000])):
+        try:
+            for i_th, top_N in enumerate(top_N_list):
+                user_embedding = user_embs[i]
+                distance, idx = index.search(user_embedding, top_N)  # emb: 4个向量。<class 'numpy.ndarray'> == (4, 32)
+                merge_result = merge_faiss_result(distance, idx)
+                pred = [item_profile['id'].values[x] for x, _ in merge_result]
 
-print('mean_score:', score_N / i)  # i为test_user_emb的个数
+                if test_true_label[uid] in pred[:top_N]:
+                    score_N[i_th] += 1
 
-# s = [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
-# np.mean(s, 1)  # array([1,2,3])
+                if i % 100000 == 0:
+                    print('finished {}, score_N:{}'.format(i, score_N))
+        except:
+            print('Error')
+            print(i)
+
+    print('mean_score:', score_N / i)  # i为test_user_emb的个数
+
+    # s = [[1, 1, 1], [2, 2, 2], [3, 3, 3]]
+    # np.mean(s, 1)  # array([1,2,3])
+    print('finished')

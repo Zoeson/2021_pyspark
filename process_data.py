@@ -55,9 +55,10 @@ def preprocess_data(data, inum=3, unum=6):
     user_dict = Counter(user_id_list)
     user_val = [user_id for user_id, v in user_dict.items() if v >= unum]
     data_filter = data_fiter_item[data_fiter_item['uid'].isin(user_val)]
+    print('==================item >={}, user>={} 之后的数据情况================'.format(inum, unum))
     print('user过滤前后    :', len(user_dict), "|", len(user_val))
     print('item过滤    :', len(data_fiter_item['id'].unique()), '|', len(data_filter['id'].unique()))
-    print('data过滤    :', data_fiter_item.shape, '|', data_filter.shape)
+    print('data过滤之后    :', data_fiter_item.shape, '|', data_filter.shape)
 
     data_sort = data_filter.sort_values('ctime', ascending=True)
 
@@ -135,5 +136,38 @@ def get_xy():
     item_unique = data['id'].uinique()
 
     return train_model_input, train_label, user_feature_columns, item_feature_columns, item_unique
+
+
+import findspark
+findspark.init()
+from pyspark.sql import SparkSession
+
+
+def init_spark():
+    """
+    服务器 client提交，有下面2行会报错
+    .config('spark.sql.hive.convertMetastoreParquet', False) \
+    .config('spark.driver.host', 'localhost') \
+
+    .appName('name')： 这一行是用yarn提交时，显示的spark的name
+    :return:
+    """
+    spark = SparkSession \
+        .builder \
+        .appName('name') \
+        .enableHiveSupport() \
+        .getOrCreate()
+    return spark
+
+
+def test_week_data():
+    sc = init_spark()
+    date = '20210611'
+    hour = '08'
+    read_path = '/user/recom/recall/mind/click_log/' + date + '/' + hour
+    data = sc.read.format('csv').option('sep', '\t').option('header', 'true').csv(read_path)
+    preprocess_data(data)
+
+
 
 

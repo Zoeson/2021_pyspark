@@ -34,7 +34,6 @@ class PoolingLayer(Layer):
 
     def call(self, seq_value_len_list, mask=None, **kwargs):
         print('    -----------CALL: PoolingLayer ')
-        print('seq_value_len_list: {}'.format(seq_value_len_list))
         if not isinstance(seq_value_len_list, list):
             seq_value_len_list = [seq_value_len_list]
         if len(seq_value_len_list) == 1:
@@ -81,7 +80,6 @@ class CapsuleLayer(Layer):
         self.bilinear_mapping_matrix = self.add_weight(shape=[self.input_units, self.out_units],
                                                        initializer=RandomNormal(stddev=self.init_std),
                                                        name="S", dtype=tf.float32)
-        print('self.routing_logit: {}\nself.bilinear_mappling_matrix:{}'.format(self.routing_logits, self.bilinear_mapping_matrix))
         super(CapsuleLayer, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
@@ -153,7 +151,6 @@ class LabelAwareAttention(Layer):
 
     def build(self, input_shape):
         self.embedding_size = input_shape[0][-1]
-        print('input_shape: {},  embedding_size:{}'.format(input_shape, self.embedding_size))
         super(LabelAwareAttention, self).build(input_shape)
 
     def call(self, inputs, training=None, **kwargs):
@@ -161,9 +158,7 @@ class LabelAwareAttention(Layer):
         query = inputs[1]  # query干啥的
         weight = reduce_sum(keys * query, axis=-1, keep_dims=True)
         weight = tf.pow(weight, self.pow_p)
-        print('###### hist_len', inputs[2])
         input_k = tf.math.log1p(tf.cast(inputs[2], dtype='float32')) / tf.math.log(2.)
-        print('hist_len计算决定:', input_k)
         if len(inputs) == 3:
             k_user = tf.cast(tf.maximum(1.,
                                         tf.minimum(tf.cast(self.k_max, dtype='float32'),
@@ -269,8 +264,7 @@ class DNN(Layer):
         """
         print('------------------DNN call----------------------')
         input_size = input_shape[-1]
-        print('hidden_inputs=[12,16,4]  == input_size:12:{}, hidden_units:(16,4){}'.format(input_size, self.hidden_units))
-        print('self.hidden_units=(16,4),  len(self.hidden_units)= 2')
+
         hidden_units = [int(input_size)] + list(self.hidden_units)  # 输入层 算是第一隐层
 
         self.kernels = [self.add_weight(name='kernel' + str(i),
@@ -283,8 +277,6 @@ class DNN(Layer):
                                      shape=(self.hidden_units[i],),
                                      initializer=Zeros(),
                                      trainable=True) for i in range(len(self.hidden_units))]
-        print('self.kernals: len:{}  ---->{}'.format(len(self.kernels), self.kernels))
-        print('self.bias: len:{}  ---->{}'.format(len(self.bias), self.bias))
 
         if self.use_bn:
             self.bn_layers = [tf.keras.layers.BatchNormalization() for _ in range(len(self.hidden_units))]

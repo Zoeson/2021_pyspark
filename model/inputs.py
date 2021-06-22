@@ -59,9 +59,7 @@ def create_embedding_dict(sparse_feature_columns, varlen_sparse_feature_columns,
                         name=prefix + '_emd_' + fc.embedding_name)
         emb.trainable = fc.trainable
         sparse_embedding[fc.embedding_name] = emb
-    print('sparse_feature_columns的 embbeding的个数：{}  \n---------keys():{}，  \n---------{}'.format(len(sparse_embedding),
-                                                                               sparse_embedding.keys(),
-                                                                               sparse_embedding))
+
     if varlen_sparse_feature_columns and len(varlen_sparse_feature_columns) > 0:
         for fc in varlen_sparse_feature_columns:
             emb = Embedding(fc.vocabulary_size, fc.embedding_dim,
@@ -71,9 +69,7 @@ def create_embedding_dict(sparse_feature_columns, varlen_sparse_feature_columns,
                             mask_zero=seq_mask_zero)
             emb.trainable = fc.trainable
             sparse_embedding[fc.embedding_name] = emb
-    print('varlen_sparse_feature_columns之后的 embbeding的个数：{}  \n---------keys():{} \n---------{}'.format(len(sparse_embedding),
-                                                                                         sparse_embedding.keys(),
-                                                                                         sparse_embedding))
+
 
     return sparse_embedding
 
@@ -100,26 +96,18 @@ def embedding_lookup(sparse_embedding_dict, sparse_input_dict, sparse_feature_co
     group_embedding_dict = defaultdict(list)
     print('\n=================embedding_lookup=====')
     for fc in sparse_feature_columns:  # item
-        print("fc.embedding_name: {}  fc:{}".format(fc.embedding_name, fc))
         feature_name = fc.name
         embedding_name = fc.embedding_name
         if len(return_feat_list) == 0 or feature_name in return_feat_list:
             if fc.use_hash:
-                print('=== embedding_lookup:\n    feature_name:{}   \n    sparse_input_dict[feature_name]:{}'
-                      .format(feature_name, sparse_input_dict[feature_name]))
                 # todo: mask_feat_list？
                 lookup_idx = Hash(fc.vocabulary_size, mask_zero=(feature_name in mask_feat_list))(
                     sparse_input_dict[feature_name])
             else:  # 默认fc.use_hash = False
-                print("sparse.use_hash = False")
                 lookup_idx = sparse_input_dict[feature_name]
 
-            print('lookup_idx: type:{},   {}'.format(type(lookup_idx), lookup_idx))
-            print("sparses_embedding_dict[embedding_name]:{}".format(sparse_embedding_dict[embedding_name]))
-            print('embedding_dict[](look_idx):{}'.format(sparse_embedding_dict[embedding_name](lookup_idx)))
             group_embedding_dict[fc.group_name].append(sparse_embedding_dict[embedding_name](lookup_idx))
 
-    print("group_embedding_dict: {}".format(group_embedding_dict))
     if to_list:
         return list(chain.from_iterable(group_embedding_dict.values()))
     return group_embedding_dict
@@ -155,7 +143,6 @@ def get_varlen_pooling_list(embedding_dict, features, varlen_sparse_feature_colu
         feature_length_name = fc.length_name
         if feature_length_name is not None:
             if fc.weight_name is not None:
-                print('        ----length_name=any_len, wight_name=any_norm ---？？      ')
                 seq_input = WeightedSequenceLayer(weight_normalization=fc.weight_norm)(
                     [embedding_dict[feature_name], features[feature_length_name], features[fc.weight_name]])
             else:

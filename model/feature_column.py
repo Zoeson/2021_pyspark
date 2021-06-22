@@ -108,23 +108,17 @@ def build_input_features(feature_columns, prefix=''):
     print("\n============================\n根据 feature_columns 生成 对应Input: --------")
     for fc in feature_columns:
         if isinstance(fc, SparseFeat):
-            print('SparseFeat:      --> 1 Input:', fc.name)
             input_features[fc.name] = Input(shape=(1,), name=prefix + fc.name, dtype=fc.dtype)
         elif isinstance(fc, DenseFeat):
-            print('DenseFeat:       --> 1 Input:', fc.name)
             input_features[fc.name] = Input(shape=(fc.dimension,), name=prefix + fc.name, dtype=fc.dtype)
         elif isinstance(fc, VarLenSparseFeat):
-            print('VarLenSparseFeat:--> N个Input:', fc.name)
             input_features[fc.name] = Input(shape=(fc.maxlen,), name=prefix + fc.name, dtype=fc.dtype)
 
             if fc.weight_name is not None:
-                print('       weight_name--> 1 Input:', fc.weight_name)
                 input_features[fc.weight_name] = Input(shape=(fc.maxlen, 1), name=prefix + fc.weight_name,
                                                        dtype='float32')
             if fc.length_name is not None:
-                print('       length_name--> 1 Input:', fc.length_name)
                 input_features[fc.length_name] = Input(shape=(1,), name=prefix + fc.length_name, dtype='int32')
         else:
             return TypeError("Invalid feature column type,got", type(fc))
-    print('---------共{}个Input'.format(len(input_features)))
     return input_features

@@ -88,12 +88,6 @@ def MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=2, p=1
     embedding_matrix_dict = create_embedding_matrix(user_feature_columns + item_feature_columns, l2_reg_embedding,
                                                     seed=seed, prefix="")
 
-    for key in embedding_matrix_dict.keys():
-        print("------------------Embedding共3个。\nEmbedding_name: {}  FC.name: {}  Embedding:{}".format(key,
-                                                                                                      embedding_matrix_dict[
-                                                                                                          key].name,
-                                                                                                      embedding_matrix_dict[
-                                                                                                          key]))
 
     # todo: 四。embedding_lookup
     """
@@ -112,7 +106,6 @@ def MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=2, p=1
                                      return_feat_list(需要mask的feature）
 
     """
-    print('\n===============item的一种类型的特征 + user的三种可能类型的特征的，embedding_lookup之后的结果===============')
     # ## todo:接下来是处理user的特征：
     # ## todo:     1）SparseFeat
     # ## todo:     2) VarLenSparseFeat: 用户行为特征
@@ -121,10 +114,8 @@ def MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=2, p=1
     # 1) user的SparseFeat特征：前两个特征：SparseFeat(user, gender)，
     dnn_input_emb_list = embedding_lookup(embedding_matrix_dict, features, sparse_feature_columns,
                                           mask_feat_list=history_feature_list, to_list=True)
-    print("user特征：dnn_input_emb_list: SparseFeat: user,gender:{}".format(dnn_input_emb_list))
 
     # 2)   user的VarLenSparseFeat特征：Behavior_feature
-    print("注意，这是KEY!!! : user特征：VarLenSparseFeat")
     keys_emb_list = embedding_lookup(embedding_matrix_dict, features, history_feature_columns, history_fc_names,
                                      history_fc_names, to_list=True)  # ['hist_item']
 
@@ -137,7 +128,6 @@ def MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=2, p=1
     # 先 WeightedSequenceLayer 然后SequencePoolingLayer
     sequence_embed_list = get_varlen_pooling_list(sequence_embed_dict, features, sparse_varlen_feature_columns,
                                                   to_list=True)
-    print("             varlen_pooling_list: sequence_embed_list: {}".format(sequence_embed_dict))
     # 4) 用户特征， 其他特征 合并
     dnn_input_emb_list += sequence_embed_list
 
@@ -146,7 +136,6 @@ def MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=2, p=1
 
     # todo: 五。CapsuleLayer：
     print('\n====================CapsuleLayer  ==============')
-    print('\n=========input: behavior_embedding:low_capsule, \nOUTPUT:high_capsule：兴趣')
     history_emb = PoolingLayer()(NoMask()(keys_emb_list))  # 进入capsule之前先Pooling
     hist_len = features['hist_len']  # mask,
     high_capsule = CapsuleLayer(input_units=item_embedding_dim,
@@ -159,7 +148,6 @@ def MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=2, p=1
         user_other_feature = combined_dnn_input(dnn_input_emb_list, dense_value_list)  # [None, 1,8]
         other_feature_tile = tf.keras.layers.Lambda(tile_user_otherfeat, arguments={'k_max': k_max})(
             user_other_feature)  # [None, 2, 8]
-        print('other_feature_tile: {}'.format(other_feature_tile))
 
         # 2> 拼接
         user_deep_input = Concatenate()([NoMask()(other_feature_tile), high_capsule])  # [None, 2, 12]
@@ -178,16 +166,13 @@ def MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=2, p=1
     # 2) QUERY: LabelAwareAttention
     query_emb_list = embedding_lookup(embedding_matrix_dict, item_features, item_feature_columns, history_feature_list,
                                       history_feature_list, to_list=True)  # ['item']
-    print("item特征：query_emb_list:{}".format(query_emb_list))
     # 2) ： item_features的embedding_lookup
     target_emb = PoolingLayer()(NoMask()(query_emb_list))
     # ==================================================================
 
     # 2). item_index
     #  todo: EmbeddingIndex:class这个是啥？？？EmbeddingIndex([0,1,2,3])(Tensor('item'))
-    print('\n -------------item poolingLayer-------------')
     item_index = EmbeddingIndex(list(range(item_vocabulary_size)))(item_features[item_feature_name])
-    print('看一下 item_index的shape:{}'.format(item_index))
 
     # 3) item_embedding_weight
     item_embedding_matrix = embedding_matrix_dict[item_feature_name]
@@ -206,9 +191,6 @@ def MIND(user_feature_columns, item_feature_columns, num_sampled=5, k_max=2, p=1
         user_embedding_final = LabelAwareAttention(k_max=k_max, pow_p=p, )((user_embeddings, target_emb))
 
     # todo: 十。 output: SampledSoftmaxLayer
-    print(
-        'pooling_item_embedding_weight: \n       {}, \nuser_embedding_final:\n      {}, \nitem_features[item_feature_name]:\n        {}'.format(
-            pooling_item_embedding_weight, user_embedding_final, item_features[item_feature_name]))
     output = SampledSoftmaxLayer(num_sampled=num_sampled)(
         [pooling_item_embedding_weight, user_embedding_final, item_features[item_feature_name]])
     #      weights                          input                    labels
